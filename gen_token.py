@@ -52,7 +52,6 @@ def gen_token():
 
     # ------------------------------------------------------------
     # Step 4: sign message with wallet private key
-    # （直接 parse payload，不做任何校验）
     # ------------------------------------------------------------
     payload_b64 = signed_data.split(".")[1]
     payload_b64 += "=" * (-len(payload_b64) % 4)
