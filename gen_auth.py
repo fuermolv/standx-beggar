@@ -10,7 +10,7 @@ from eth_account.messages import encode_defunct
 
 
 
-def gen_token():
+def gen_auth():
     addr = os.getenv("STANDX_BEGGAR_ADDR")
     if not addr:
         raise ValueError("STANDX_BEGGAR_ADDR environment variable is not set.")
@@ -25,6 +25,7 @@ def gen_token():
     # Step 1: requestId
     # ------------------------------------------------------------
     signing_key = SigningKey.generate()
+    
     public_key_bytes = signing_key.verify_key.encode()
     request_id = base58.b58encode(public_key_bytes).decode()
     print(f"Generated Request ID: {request_id}")
@@ -76,7 +77,7 @@ def gen_token():
         json={
             "signature": wallet_signature,
             "signedData": signed_data,
-            "expiresSeconds": 604800,
+            "expiresSeconds": 86400 * 60,
         },
     )
 
@@ -91,12 +92,21 @@ def gen_token():
     print("Access token received")
     print(f"Address: {login_data.get('address')}")
     print(f"Chain: {login_data.get('chain')}")
-    return token
+    return {
+        'access_token': token,
+        'signing_key': signing_key,
+    }
+
 
 
 def main():
-    token = gen_token()
-    print(f"access token: {token}")
+    auth = gen_auth()
+    with open("standx_beggar_auth.json", "w") as f:
+        json.dump({
+            'access_token': auth['access_token'],
+            'signing_key': auth['signing_key'].encode().hex(),
+        }, f)
+    print("Authentication data saved to standx_beggar_auth.json")
 
 
 if __name__ == "__main__":
