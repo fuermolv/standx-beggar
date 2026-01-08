@@ -5,13 +5,21 @@ from nacl.signing import SigningKey
 from common import query_order, cancel_order, taker_clean_position, get_price, create_order, maker_clean_position, query_positions
 from backoff import CancelBackoff
 from config import POSITION
-
+import signal
 
 BPS = 20
 MIN_BPS = 10
 MAX_BPS = 30
 SIDE = "sell"
 
+_should_exit = False
+
+def _on_term(signum, frame):
+    global _should_exit
+    _should_exit = True
+
+signal.signal(signal.SIGTERM, _on_term)
+signal.signal(signal.SIGINT, _on_term)
 
 def clean_position(auth):
     positions = query_positions(auth)
@@ -81,6 +89,8 @@ def main():
                 qty = POSITION / float(order_price)
                 qty = format(qty, ".4f")
                 cl_ord_id = create_order(auth, order_price, qty, SIDE)
+            if _should_exit:
+                break
             time.sleep(0.05)
     finally:
         if cl_ord_id:

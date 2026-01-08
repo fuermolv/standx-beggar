@@ -6,10 +6,22 @@ from common import query_order, cancel_order, taker_clean_position, get_price, c
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from backoff import CancelBackoff
 from config import POSITION
+import signal
 
 BPS = 8.5
 MIN_BPS = 7
 MAX_BPS = 10
+
+
+
+_should_exit = False
+
+def _on_term(signum, frame):
+    global _should_exit
+    _should_exit = True
+
+signal.signal(signal.SIGTERM, _on_term)
+signal.signal(signal.SIGINT, _on_term)
 
 
 
@@ -117,6 +129,8 @@ def main():
                     short_qty = POSITION / float(short_order_price)
                     short_qty = format(short_qty, ".4f")
                     short_cl_ord_id = create_order(auth, short_order_price, short_qty, "sell")
+                if _should_exit:
+                    break
                 time.sleep(0.05)
         finally:
             cl_ord_ids = [cid for cid in [long_cl_ord_id, short_cl_ord_id] if cid]
