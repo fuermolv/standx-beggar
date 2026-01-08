@@ -6,9 +6,9 @@ from common import query_order, cancel_order, taker_clean_position, get_price, c
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from backoff import CancelBackoff
 
-POSITION = 25000
+POSITION = 50000
 BPS = 8.5
-MIN_BPS = 7
+MIN_BPS = 7.5
 MAX_BPS = 10
 
 
