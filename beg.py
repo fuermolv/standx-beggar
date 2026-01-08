@@ -65,8 +65,8 @@ def main():
                 if order["status"] == "filled":
                     clean_position(auth)
                     cl_ord_id = None
-                    print("position cleaned, placing new orders after 10 seconds")
-                    time.sleep(10)
+                    print("position cleaned, placing new orders after 120 seconds")
+                    time.sleep(120)
                 if diff_bps <= MIN_BPS or diff_bps >= MAX_BPS:
                     cancel_order(auth, cl_ord_id)
                     cl_ord_id = None
