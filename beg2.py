@@ -4,6 +4,7 @@ import time
 from nacl.signing import SigningKey
 from common import query_order, cancel_order, taker_clean_position, get_price, create_order, maker_clean_position, query_positions
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from backoff import CancelBackoff
 
 POSITION = 5000
 BPS = 9
@@ -71,6 +72,7 @@ def cancel_orders(auth, cl_ord_ids, max_workers=5):
 
 
 def main():
+    backoff = CancelBackoff()
     with open("standx_beggar_auth.json", "r") as f:
         auth_json = json.load(f)
         auth = {
@@ -96,16 +98,13 @@ def main():
                             short_cl_ord_id = None
                             print("position cleaned, placing new orders after 10 seconds")
                             time.sleep(10)
-                    if long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS:
+                    if long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS or short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS:
                         cancel_orders(auth, [cid for cid in [long_cl_ord_id, short_cl_ord_id] if cid])
                         long_cl_ord_id = None
                         short_cl_ord_id = None
-                        time.sleep(1)
-                    if short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS:
-                        cancel_orders(auth, [cid for cid in [long_cl_ord_id, short_cl_ord_id] if cid])
-                        long_cl_ord_id = None
-                        short_cl_ord_id = None
-                        time.sleep(1)
+                        next_sleep = backoff.next_sleep()
+                        print(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
+                        time.sleep(next_sleep)
                 else:   
                     long_order_price = mark_price * (1 - BPS / 10000)
                     long_order_price = format(long_order_price, ".2f")

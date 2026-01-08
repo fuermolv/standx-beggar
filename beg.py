@@ -3,7 +3,7 @@ import json
 import time
 from nacl.signing import SigningKey
 from common import query_order, cancel_order, taker_clean_position, get_price, create_order, maker_clean_position, query_positions
-
+from backoff import CancelBackoff
 
 POSITION = 50000
 BPS = 20
@@ -47,6 +47,7 @@ def clean_position(auth):
 
 
 def main():
+    backoff = CancelBackoff()
     with open("standx_beggar_auth.json", "r") as f:
         auth_json = json.load(f)
         auth = {
@@ -69,6 +70,9 @@ def main():
                 if diff_bps <= MIN_BPS or diff_bps >= MAX_BPS:
                     cancel_order(auth, cl_ord_id)
                     cl_ord_id = None
+                    next_sleep = backoff.next_sleep()
+                    print(f"bps out of range, canceling order, sleeping for {next_sleep} seconds")
+                    time.sleep(next_sleep)
             else:
                 sign = 1 if SIDE == "sell" else -1
                 order_price = mark_price * (1 + sign * BPS / 10000)
