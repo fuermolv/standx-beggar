@@ -110,7 +110,7 @@ def create_order(auth, price, qty, side):
         "qty": qty,
         "price": str(price),
         "margin_mode": "cross",
-        "time_in_force": "gtc",
+        "time_in_force": "alo",
         "reduce_only": False,
         "cl_ord_id": cl_ord_id,
     }
