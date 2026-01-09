@@ -44,6 +44,9 @@ def request_with_retry(
             if response.status_code == 200:
                 return response
             else:
+                if response.status_code == 404:
+                    # For 404, no point in retrying
+                    raise Exception(f"Resource not found: {url}")
                 # For non-200 status codes, raise an exception to trigger retry logic
                 last_exc = Exception(f"Non-200 response: {response.status_code} {response.text}")
                 if attempt >= max_retries:
