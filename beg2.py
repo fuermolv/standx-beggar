@@ -157,6 +157,9 @@ def main():
                 if cl_ord_ids:
                     print("cleaning up open orders")
                     cancel_orders(auth, cl_ord_ids)
+                long_cl_ord_id = None
+                short_cl_ord_id = None
+                order_dict = None
                 clean_position(auth)
                 print("cleanup done, sleeping for 60 seconds before next iteration")
                 time.sleep(60)

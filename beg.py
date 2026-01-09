@@ -116,6 +116,8 @@ def main():
                     if cl_ord_id:
                         print("cleaning up open order")
                         cancel_order(auth, cl_ord_id)
+                    cl_ord_id = None
+                    order = None
                     clean_position(auth)
                     print("sleeping for 60 seconds before restarting main loop")
                     time.sleep(60)
