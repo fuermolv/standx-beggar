@@ -165,7 +165,7 @@ def main():
         if cl_ord_ids:
             print("cleaning up open orders")
             cancel_orders(auth, cl_ord_ids)
-    clean_position(auth)
+        clean_position(auth)
     
 
 
