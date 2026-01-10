@@ -3,7 +3,7 @@ from collections import deque
 
 class CancelBackoff:
 
-    def __init__(self, base_seconds=2, factor=2, window_seconds=60, max_seconds=None):
+    def __init__(self, base_seconds=2, factor=2, window_seconds=120, max_seconds=None):
         self.base = float(base_seconds)  # 初始等待时间
         self.factor = float(factor)  # 指数退避的倍数
         self.window = float(window_seconds)  # 窗口时间
@@ -23,10 +23,7 @@ class CancelBackoff:
 
         # 计算退避时间
         retries = len(self._events) - 1  # 重试次数
-        if retries == 0:
-            sec = 0  # 第一次退避时间为 0
-        else:
-            sec = self.base * (self.factor ** (retries - 1))  # 后续按指数倍增加
+        sec = self.base * (self.factor ** retries)
 
         if self.max_seconds is not None:
             sec = min(sec, self.max_seconds)  # 如果有最大限制时间，取最小值

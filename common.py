@@ -1,206 +1,78 @@
-import json
-import uuid
 import time
-import base64
-import random
-import requests
-from nacl.signing import SigningKey
+from concurrent.futures import ThreadPoolExecutor
+from st_http import query_open_orders, query_positions, maker_clean_position, query_order, taker_clean_position, cancel_orders, create_order, query_open_orders
 
 
-BASE_URL = "https://perps.standx.com"
-PAIR = "BTC-USD"
 
 
-# --------- NEW: a shared session + retry wrapper (minimal intrusion) ---------
-session = requests.Session()
-
-def request_with_retry(
-    session,
-    method,
-    url,
-    *,
-    headers=None,
-    params=None,
-    data=None,
-    timeout=(3.0, 10.0),      # (connect_timeout, read_timeout)
-    max_retries=3,
-    backoff_base=0.4,         # seconds
-):
-    """
-    Retry on all types of failure, including connection-level failures and non-200 HTTP status codes.
-    """
-    last_exc = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = session.request(
-                method,
-                url,
-                headers=headers,
-                params=params,
-                data=data,
-                timeout=timeout,
-            )
-            # If the response status code is 200, return the response
-            if response.status_code == 200:
-                return response
-            else:
-                if response.status_code == 404:
-                    # For 404, no point in retrying
-                    raise Exception(f"Resource not found: {url}")
-                # For non-200 status codes, raise an exception to trigger retry logic
-                last_exc = Exception(f"Non-200 response: {response.status_code} {response.text}")
-                if attempt >= max_retries:
-                    raise last_exc
-                # exponential backoff + small jitter
-                sleep_s = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
-                print(f"Non-200 response received: {response.status_code}. Retrying in {sleep_s} seconds...")
-                time.sleep(sleep_s)
-        except (requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-                requests.exceptions.ChunkedEncodingError) as e:
-            last_exc = e
-            if attempt >= max_retries:
-                raise
-            # exponential backoff + small jitter
-            sleep_s = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
-            print(f"Connection error encountered: {e}. Retrying in {sleep_s} seconds...")
-            time.sleep(sleep_s)
-    # theoretically unreachable
-    raise last_exc
-# ---------------------------------------------------------------------------
 
 
-def get_headers(auth, payload_str=None):
-    x_request_version = "v1"
-    x_request_id = str(uuid.uuid4())
-    x_request_timestamp = str(int(time.time() * 1000))
-    access_token = auth['access_token']
-    signing_key = auth['signing_key']
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "x-request-sign-version": x_request_version,
-        "x-request-id": x_request_id,
-        "x-request-timestamp": x_request_timestamp,
-    }
-    if payload_str:
-        msg = f"{x_request_version},{x_request_id},{x_request_timestamp},{payload_str}"
-        msg_bytes = msg.encode("utf-8")
-        signed = signing_key.sign(msg_bytes)
-        signature = base64.b64encode(signed.signature).decode("ascii")
-        headers["x-request-signature"] = signature
-        headers["Content-Type"] = "application/json"
-    return headers
 
 
-# https://docs.standx.com/standx-api/perps-http#query-symbol-price
-def get_price(auth):
-    url = f"{BASE_URL}/api/query_symbol_price"
-    params = {"symbol": PAIR}
-    resp = request_with_retry(session, "GET", url, headers=get_headers(auth), params=params)
-    if resp.status_code != 200:
-        raise Exception(f"get_price failed: {resp.status_code} {resp.text}")
-    return resp.json()
+
+def clean_positions(auth):
+    positions = query_positions(auth)
+    if not [position for position in positions if position['qty'] and float(position['qty']) != 0]:
+        print("no positions to clean")
+        return
+    for position in positions:
+        if not position['qty'] or float(position['qty']) == 0:
+            continue
+        side = 'sell' if float(position['qty']) < 0 else 'buy'
+        qty = abs(float(position['qty']))
+        clean_side = 'buy' if side == 'sell' else 'sell'
+        entry_price = float(position['entry_price'])
+        price = entry_price
+        print(f'Cleaning position: side={side}, qty={qty}, entry_price={entry_price}, maker price {price}, position_value={abs(float(position["position_value"]))}')
+        cl_ord_id = maker_clean_position(auth, price, qty, clean_side)
+        for index in range(30):
+            order = query_order(auth, cl_ord_id)
+            print(f'{index} waiting maker cleaning position order status: {order["status"]} qty: {order["qty"]}  order price: {order["price"]}')
+            if order["status"] == "filled":
+                print("maker clean position filled")
+                return
+            time.sleep(1)
+        print("maker clean position timeout, canceling order")
+        cancel_orders(auth, [cl_ord_id])
 
 
-# https://docs.standx.com/standx-api/perps-http#create-new-order
-def create_order(auth, price, qty, side):
-    url = f"{BASE_URL}/api/new_order"
-    cl_ord_id = str(uuid.uuid4())
-    data = {
-        "symbol": PAIR,
-        "side": side,
-        "order_type": "limit",
-        "qty": qty,
-        "price": str(price),
-        "margin_mode": "cross",
-        "time_in_force": "alo",
-        "reduce_only": False,
-        "cl_ord_id": cl_ord_id,
-    }
-
-    payload_str = json.dumps(data, separators=(",", ":"))
-    resp = request_with_retry(session, "POST", url, headers=get_headers(auth, payload_str), data=payload_str)
-    if resp.status_code != 200:
-        raise Exception(f"create_order failed: {resp.status_code} {resp.text} data: {data}")
-    print(f"creating order: side={side}, price={price}, qty={qty}, cl_ord_id={cl_ord_id}")
-    return cl_ord_id
+    print("using taker to clean position")
+    STEP_QTY = 0.1
+    positions = query_positions(auth)
+    while [position for position in positions if position['qty'] and float(position['qty']) != 0]:
+        for position in positions:
+            if not position['qty'] or float(position['qty']) == 0:
+                continue
+            side = 'sell' if float(position['qty']) < 0 else 'buy'
+            qty = abs(float(position['qty']))
+            clean_side = 'buy' if side == 'sell' else 'sell'
+            clean_qty = qty if qty < STEP_QTY else STEP_QTY
+            print(f"taker cleaning position: side={side}, qty={qty}, cleaning qty={clean_qty}")
+            taker_clean_position(auth, clean_qty, clean_side)
+            time.sleep(5)
+        positions = query_positions(auth)
+    print("taker clean position done")
+      
 
 
-def maker_clean_position(auth, price, qty, side):
-    url = f"{BASE_URL}/api/new_order"
-    cl_ord_id = str(uuid.uuid4())
-    data = {
-        "symbol": PAIR,
-        "side": side,
-        "order_type": "limit",
-        "qty": qty,
-        "price": str(price),
-        "margin_mode": "cross",
-        "time_in_force": "gtc",
-        "reduce_only": True,
-        "cl_ord_id": cl_ord_id,
-    }
-
-    payload_str = json.dumps(data, separators=(",", ":"))
-    resp = request_with_retry(session, "POST", url, headers=get_headers(auth, payload_str), data=payload_str)
-    if resp.status_code != 200:
-        raise Exception(f"create_order failed: {resp.status_code} {resp.text}")
-    print(f"maker cleaning position with limit order: side={side}, price={price}, qty={qty}")
-    return cl_ord_id
+def create_orders(auth, orders):
+    def _create_one(order):
+        return create_order(
+            auth,
+            order['price'],
+            order['qty'],
+            order['side'],
+        )
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        return list(ex.map(_create_one, orders))
 
 
-def taker_clean_position(auth, qty, side):
-    url = f"{BASE_URL}/api/new_order"
-    data = {
-        "symbol": PAIR,
-        "side": side,
-        "order_type": "market",
-        "qty": qty,
-        "margin_mode": "cross",
-        "time_in_force": "gtc",
-        "reduce_only": True,
-    }
-    payload_str = json.dumps(data, separators=(",", ":"))
-    resp = request_with_retry(session, "POST", url, headers=get_headers(auth, payload_str), data=payload_str)
-    if resp.status_code != 200:
-        raise Exception(f"create_order failed: {resp.status_code} {resp.text}")
-    print(f"cleaning position with taker: side={side}, qty={qty}")
-    return resp.json()
-
-
-# https://docs.standx.com/standx-api/perps-http#cancel-multiple-orders
-def cancel_order(auth, cl_order_id):
-    url = f"{BASE_URL}/api/cancel_orders"
-    data = {
-        "cl_ord_id_list": [cl_order_id],
-    }
-    payload_str = json.dumps(data, separators=(",", ":"))
-    resp = request_with_retry(session, "POST", url, headers=get_headers(auth, payload_str), data=payload_str)
-    if resp.status_code != 200:
-        raise Exception(f"cancel_orders failed: {resp.status_code} {resp.text}")
-    print(f"cancel order: {cl_order_id}")
-    return resp.json()
-
-
-def query_order(auth, cl_ord_id):
-    url = f"{BASE_URL}/api/query_order"
-    params = {"cl_ord_id": cl_ord_id}
-    resp = request_with_retry(
-        session,
-        "GET",
-        url,
-        headers=get_headers(auth),
-        params=params,
-    )
-    if resp.status_code != 200:
-        raise Exception(f"query_position failed: {resp.status_code} {resp.text}")
-    return resp.json()
-
-
-def query_positions(auth):
-    url = f"{BASE_URL}/api/query_positions"
-    params = {"symbol": PAIR}
-    resp = request_with_retry(session, "GET", url, headers=get_headers(auth), params=params)
-    if resp.status_code != 200:
-        raise Exception(f"query_position failed: {resp.status_code} {resp.text}")
-    return resp.json()
+def clean_orders(auth):
+    res = query_open_orders(auth)
+    orders = res.get("result", [])
+    cl_order_ids = [order["cl_ord_id"] for order in orders]
+    if cl_order_ids:
+        cancel_orders(auth, cl_order_ids)
+        print(f"canceled all open orders: {cl_order_ids}")
+    else:
+        print("no open orders to cancel")
