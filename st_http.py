@@ -38,7 +38,7 @@ def request_with_retry(
                 headers=headers,
                 params=params,
                 data=data,
-                timeout=timeout,
+                # timeout=timeout,
             )
             # If the response status code is 200, return the response
             if response.status_code == 200:
