@@ -23,7 +23,7 @@ def request_with_retry(
     params=None,
     data=None,
     timeout=(3.0, 10.0),      # (connect_timeout, read_timeout)
-    max_retries=3,
+    max_retries=10,
     backoff_base=0.4,         # seconds
 ):
     """
