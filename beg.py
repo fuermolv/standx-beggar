@@ -123,10 +123,14 @@ if __name__ == "__main__":
             'access_token': auth_json['access_token'],
             'signing_key': SigningKey(bytes.fromhex(auth_json['signing_key'])),
         }
-    try:
-        main(args.position, auth)
-    finally:
-        clean_orders(auth)
-        clean_positions(auth)
-        print("Exiting beggar")
-
+    while True:
+        try:
+            main(args.position, auth)
+        finally:
+            clean_orders(auth)
+            clean_positions(auth)
+            print("Exiting beggar")
+        if _should_exit:
+            break
+        print("Restarting beggar after 600 seconds")
+        time.sleep(600)
