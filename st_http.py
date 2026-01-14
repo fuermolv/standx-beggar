@@ -5,7 +5,9 @@ import base64
 import random
 import requests
 from nacl.signing import SigningKey
+import logging
 
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://perps.standx.com"
 PAIR = "BTC-USD"
@@ -28,7 +30,7 @@ def request_with_retry(
     headers_factory=None,   # lazily build headers per attempt
     params=None,
     data=None,
-    timeout=(3.0, 10.0),    # (connect_timeout, read_timeout)
+    timeout=(3.0, 15),    # (connect_timeout, read_timeout)
     max_retries=5,
     backoff_base=0.4,       # seconds
 ):
@@ -45,10 +47,11 @@ def request_with_retry(
         # 统一打印为 ISO8601（含时区）；如果你更想用本地时间，把 timezone.utc 去掉即可
         return datetime.now(timezone.utc).astimezone().isoformat(timespec="milliseconds")
 
-    def _log_failure(*, ts, duration_s, status_code, message):
+    def _log_failure(*, url, ts, duration_s, status_code, message):
         # 按你要求：请求持续时间，返回码，返回消息，请求时间点
-        print(
-            f"[request_with_retry] ts={ts} "
+        logger.info(
+            f"[request_with_retry] url={url} "
+            f"ts={ts} "
             f"dur={duration_s:.3f}s "
             f"status={status_code} "
             f"msg={message}"
@@ -72,6 +75,10 @@ def request_with_retry(
             )
             duration_s = time.perf_counter() - t0
 
+            if duration_s > 3.0:
+                # 慢请求也打印日志
+                logger.info(f"[request_with_retry] Slow request: url={url} dur={duration_s:.3f}s ts={ts}")
+
             # If the response status code is 200, return the response
             if response.status_code == 200:
                 return response
@@ -79,6 +86,7 @@ def request_with_retry(
                 # 失败：打印耗时/状态码/消息/时间点
                 # message 用 response.text（必要时可自行截断，避免太长）
                 _log_failure(
+                    url=url,
                     ts=ts,
                     duration_s=duration_s,
                     status_code=response.status_code,
@@ -96,7 +104,7 @@ def request_with_retry(
 
                 # exponential backoff + small jitter
                 sleep_s = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
-                print(f"Non-200 response received: {response.status_code}. Retrying in {sleep_s} seconds...")
+                logger.info(f"Non-200 response received: {response.status_code}. Retrying in {sleep_s} seconds...")
                 time.sleep(sleep_s)
 
         except (requests.exceptions.ConnectionError,
@@ -118,7 +126,7 @@ def request_with_retry(
 
             # exponential backoff + small jitter
             sleep_s = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
-            print(f"Connection error encountered: {e}. Retrying in {sleep_s} seconds...")
+            logger.info(f"Connection error encountered: {e}. Retrying in {sleep_s} seconds...")
             time.sleep(sleep_s)
 
     # theoretically unreachable
@@ -186,12 +194,14 @@ def create_order(auth, price, qty, side):
         session,
         "POST",
         url,
+        # timeout=(0.5, 1.0),
+        max_retries=0,
         headers_factory=lambda: get_headers(auth, payload_str),
         data=payload_str,
     )
     if resp.status_code != 200:
         raise Exception(f"create_order failed: {resp.status_code} {resp.text} data: {data}")
-    print(f"creating order: side={side}, price={price}, qty={qty}, cl_ord_id={cl_ord_id}")
+    logger.info(f"creating order: side={side}, price={price}, qty={qty}, cl_ord_id={cl_ord_id}")
     return cl_ord_id
 
 
@@ -220,7 +230,7 @@ def maker_clean_position(auth, price, qty, side):
     )
     if resp.status_code != 200:
         raise Exception(f"create_order failed: {resp.status_code} {resp.text}")
-    print(f"maker cleaning position with limit order: side={side}, price={price}, qty={qty}")
+    logger.info(f"maker cleaning position with limit order: side={side}, price={price}, qty={qty}")
     return cl_ord_id
 
 
@@ -245,7 +255,7 @@ def taker_clean_position(auth, qty, side):
     )
     if resp.status_code != 200:
         raise Exception(f"create_order failed: {resp.status_code} {resp.text}")
-    print(f"cleaning position with taker: side={side}, qty={qty}")
+    logger.info(f"cleaning position with taker: side={side}, qty={qty}")
     return resp.json()
 
 
@@ -267,7 +277,7 @@ def cancel_orders(auth, cl_ord_ids):
     )
     if resp.status_code != 200:
         raise Exception(f"cancel_orders failed: {resp.status_code} {resp.text}")
-    print(f"cancel order: {cl_ord_ids}")
+    logger.info(f"cancel order: {cl_ord_ids}")
     return resp.json()
 
 

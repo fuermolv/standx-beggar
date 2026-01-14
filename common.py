@@ -1,8 +1,9 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
 from st_http import query_open_orders, query_positions, maker_clean_position, query_order, taker_clean_position, cancel_orders, create_order, query_open_orders
+import logging
 
-
+logger = logging.getLogger(__name__)
 
 
 
@@ -13,7 +14,7 @@ from st_http import query_open_orders, query_positions, maker_clean_position, qu
 def clean_positions(auth):
     positions = query_positions(auth)
     if not [position for position in positions if position['qty'] and float(position['qty']) != 0]:
-        print("no positions to clean")
+        logger.info("no positions to clean")
         return
     for position in positions:
         if not position['qty'] or float(position['qty']) == 0:
@@ -23,20 +24,20 @@ def clean_positions(auth):
         clean_side = 'buy' if side == 'sell' else 'sell'
         entry_price = float(position['entry_price'])
         price = entry_price
-        print(f'Cleaning position: side={side}, qty={qty}, entry_price={entry_price}, maker price {price}, position_value={abs(float(position["position_value"]))}')
+        logger.info(f'Cleaning position: side={side}, qty={qty}, entry_price={entry_price}, maker price {price}, position_value={abs(float(position["position_value"]))}')
         cl_ord_id = maker_clean_position(auth, price, qty, clean_side)
         for index in range(30):
             order = query_order(auth, cl_ord_id)
-            print(f'{index} waiting maker cleaning position order status: {order["status"]} qty: {order["qty"]}  order price: {order["price"]}')
+            logger.info(f'{index} waiting maker cleaning position order status: {order["status"]} qty: {order["qty"]}  order price: {order["price"]}')
             if order["status"] == "filled":
-                print("maker clean position filled")
+                logger.info("maker clean position filled")
                 return
             time.sleep(1)
-        print("maker clean position timeout, canceling order")
+        logger.info("maker clean position timeout, canceling order")
         cancel_orders(auth, [cl_ord_id])
 
 
-    print("using taker to clean position")
+    logger.info("using taker to clean position")
     STEP_QTY = 0.1
     positions = query_positions(auth)
     while [position for position in positions if position['qty'] and float(position['qty']) != 0]:
@@ -47,11 +48,11 @@ def clean_positions(auth):
             qty = abs(float(position['qty']))
             clean_side = 'buy' if side == 'sell' else 'sell'
             clean_qty = qty if qty < STEP_QTY else STEP_QTY
-            print(f"taker cleaning position: side={side}, qty={qty}, cleaning qty={clean_qty}")
+            logger.info(f"taker cleaning position: side={side}, qty={qty}, cleaning qty={clean_qty}")
             taker_clean_position(auth, clean_qty, clean_side)
             time.sleep(5)
         positions = query_positions(auth)
-    print("taker clean position done")
+    logger.info("taker clean position done")
       
 
 
@@ -73,6 +74,6 @@ def clean_orders(auth):
     cl_order_ids = [order["cl_ord_id"] for order in orders]
     if cl_order_ids:
         cancel_orders(auth, cl_order_ids)
-        print(f"canceled all open orders: {cl_order_ids}")
+        logger.info(f"canceled all open orders: {cl_order_ids}")
     else:
-        print("no open orders to cancel")
+        logger.info("no open orders to cancel")

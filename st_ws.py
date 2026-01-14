@@ -3,6 +3,9 @@ import threading
 import time
 import websocket
 from nacl.signing import SigningKey
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -43,10 +46,10 @@ class StandXWSBase:
                 pass
     
     def _on_error(self, ws, error):
-        print(f"{self.name} ws error:", error)
+        logger.info(f"{self.name} ws error:", error)
 
     def _on_close(self, ws, close_status_code, close_msg):
-        print(f"{self.name} ws closed: code={close_status_code} msg={close_msg}")
+        logger.info(f"{self.name} ws closed: code={close_status_code} msg={close_msg}")
 
     def _on_open(self, ws):
         raise NotImplementedError()
@@ -86,7 +89,7 @@ class StandXPriceWS(StandXWSBase):
             data = msg.get("data")
             self.setter(data)
         else:
-            print("price ws other message:", msg)
+            logger.info("price ws other message:", msg)
 
 
 class StandXPositionWS(StandXWSBase):
@@ -122,7 +125,7 @@ class StandXPositionWS(StandXWSBase):
             self.setter(p)
             return
         else:
-            print("position ws other message:", msg)
+            logger.info("position ws other message:", msg)
 
 
 
@@ -146,7 +149,7 @@ class BinancePriceWS(StandXWSBase):
         super().__init__("binance_book_ticker", ws_url, reconnect_sleep)
 
     def _on_open(self, ws):
-        print("binance ws opened")
+        logger.info("binance ws opened")
 
     def _on_message(self, ws, message):
         # 直接打印，验证是否能收到
@@ -185,6 +188,6 @@ if __name__ == "__main__":
 
     while True:
         time.sleep(1)
-        print('----------------------------------')
-        print(bn_price)
+        logger.info('----------------------------------')
+        logger.info(bn_price)
      

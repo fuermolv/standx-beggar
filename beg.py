@@ -1,6 +1,7 @@
 
 import json
 import time
+import logging
 from nacl.signing import SigningKey
 from backoff import CancelBackoff
 import signal
@@ -11,6 +12,8 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from config import SKIP_HOUR_START, SKIP_HOUR_END
 from common import create_orders, clean_positions, clean_orders
+
+logger = logging.getLogger(__name__)
 
 
 def _on_term(signum, frame):
@@ -33,7 +36,7 @@ st_position = None
 
 def main(position, auth):
     backoff = CancelBackoff()
-    print(f"Starting beggar with position size: {position}")
+    logger.info(f"Starting beggar with position size: {position}")
     def set_price(p):
         global st_price_dict
         st_price_dict = p
@@ -53,7 +56,7 @@ def main(position, auth):
 
     while True:
         if not st_price_dict:
-            print("waiting for price data...")
+            logger.info("waiting for price data...")
             time.sleep(1)
             continue
         mark_price = float(st_price_dict.get("mid_price", 0))
@@ -63,15 +66,15 @@ def main(position, auth):
             bps = abs(mark_price - order_dict['price']) / mark_price * 10000
             if last_price != mark_price:
                 last_price = mark_price
-                print(f'pos:{position}, mark_price: {mark_price}, bps: {bps}')
+                logger.info(f'pos:{position}, mark_price: {mark_price}, bps: {bps}')
             if st_position:
                 if st_position['qty'] and float(st_position['qty']) != 0:
-                    print("existing position detected, canceling orders and cleaning position")
+                    logger.info("existing position detected, canceling orders and cleaning position")
                     clean_orders(auth)
-                    print("position filled, cleaning position")
+                    logger.info("position filled, cleaning position")
                     clean_positions(auth)
                     order_dict = None
-                    print("position cleaned, placing new orders after 900 seconds")
+                    logger.info("position cleaned, placing new orders after 900 seconds")
                     for i in range(900):
                         if _should_exit:
                             break
@@ -80,7 +83,7 @@ def main(position, auth):
                 cancel_orders(auth, [order_dict['cl_ord_id']] if order_dict['cl_ord_id'] else [])
                 order_dict = None
                 next_sleep = backoff.next_sleep()
-                print(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
+                logger.info(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
                 time.sleep(next_sleep)
         else:   
             current_time = datetime.now(ZoneInfo("Asia/Shanghai"))
@@ -88,7 +91,7 @@ def main(position, auth):
             if SKIP_HOUR_START <= current_hour < SKIP_HOUR_END:
                 if order_dict:
                     cancel_orders(auth, [order_dict['cl_ord_id']] if order_dict['cl_ord_id'] else [])
-                print(f'now is between {SKIP_HOUR_START} and {SKIP_HOUR_END}, skipping order creation')
+                logger.info(f'now is between {SKIP_HOUR_START} and {SKIP_HOUR_END}, skipping order creation')
                 time.sleep(10)
                 continue
             if SIDE == "buy":
@@ -130,12 +133,12 @@ if __name__ == "__main__":
         try:
             main(args.position, auth)
         except Exception as e:
-                print(f"Exception in beggar: {e} traceback: {e.__traceback__}")
+                logger.info(f"Exception in beggar: {e} traceback: {e.__traceback__}")
         finally:
             clean_orders(auth)
             clean_positions(auth)
-            print("Exiting beggar")
+            logger.info("Exiting beggar")
         if _should_exit:
             break
-        print("Restarting beggar after 120 seconds")
+        logger.info("Restarting beggar after 120 seconds")
         time.sleep(120)
