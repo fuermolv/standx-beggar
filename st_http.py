@@ -115,6 +115,7 @@ def request_with_retry(
 
             # 失败：打印耗时/状态码/消息/时间点（此类异常没有 HTTP 返回码）
             _log_failure(
+                url=url,
                 ts=ts,
                 duration_s=duration_s,
                 status_code=None,
@@ -194,7 +195,7 @@ def create_order(auth, price, qty, side):
         session,
         "POST",
         url,
-        timeout=(0.5, 1.0),
+        timeout=(0.5, 1),
         max_retries=0,
         headers_factory=lambda: get_headers(auth, payload_str),
         data=payload_str,
