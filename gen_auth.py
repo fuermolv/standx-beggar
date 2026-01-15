@@ -77,7 +77,7 @@ def gen_auth():
         json={
             "signature": wallet_signature,
             "signedData": signed_data,
-            "expiresSeconds": 86400 * 60,
+            "expiresSeconds": 86400 * 365,
         },
     )
 
