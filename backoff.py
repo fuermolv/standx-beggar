@@ -49,6 +49,11 @@ class CancelBackoff:
         self._sec = self.base
         self._last_ts = None
 
+    def penalty(self, n=1):
+        now = time.monotonic()
+        for _ in range(n):
+            self._events.append(now)
+            
     def next_sleep(self):
         now = time.monotonic()
 

@@ -89,12 +89,14 @@ def main(position, auth):
             if long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS or short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS:
                 cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
                 order_dict = None
-                next_sleep = backoff.next_sleep()
-                logger.info(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
-                time.sleep(next_sleep)
                 if abs(long_diff_bps) > THROTTLE_BPS or abs(short_diff_bps) > THROTTLE_BPS:
-                    logger.info(f"bps out of throttle range {THROTTLE_BPS}, sleeping for 300 seconds")
+                    logger.info(f"bps out of throttle range {THROTTLE_BPS}, canceling orders, sleeping for 300 seconds")
                     time.sleep(300)
+                    backoff.penalty(3)
+                else:
+                    next_sleep = backoff.next_sleep()
+                    logger.info(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
+                    time.sleep(next_sleep)
         else:   
             current_time = datetime.now(ZoneInfo("Asia/Shanghai"))
             current_hour = current_time.hour
