@@ -1,7 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from duckdb import order
 from st_http import query_open_orders, query_positions, maker_clean_position, query_order, taker_clean_position, cancel_orders, create_order, query_open_orders
 import logging
 
