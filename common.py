@@ -1,5 +1,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
+
+from duckdb import order
 from st_http import query_open_orders, query_positions, maker_clean_position, query_order, taker_clean_position, cancel_orders, create_order, query_open_orders
 import logging
 
@@ -27,9 +29,9 @@ def clean_positions(auth):
         logger.info(f'Cleaning position: side={side}, qty={qty}, entry_price={entry_price}, maker price {price}, position_value={abs(float(position["position_value"]))}')
         cl_ord_id = maker_clean_position(auth, price, qty, clean_side)
         for index in range(30):
-            order = query_order(auth, cl_ord_id)
-            logger.info(f'{index} waiting maker cleaning position order status: {order["status"]} qty: {order["qty"]}  order price: {order["price"]}')
-            if order["status"] == "filled":
+            positions = query_positions(auth)
+            logger.info(f'{index} waiting maker cleaning position order  qty: {qty}  order price: {price}')
+            if not [position for position in positions if position['qty'] and float(position['qty']) != 0]:
                 logger.info("maker clean position filled")
                 return
             time.sleep(1)

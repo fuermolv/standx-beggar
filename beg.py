@@ -121,9 +121,10 @@ def main(position, auth):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--position", default=500, type=int, help="Position size")
+    parser.add_argument("--auth", default="standx_beggar_auth.json", type=str, help="Path to auth json file")
     args = parser.parse_args()
 
-    with open("standx_beggar_auth.json", "r") as f:
+    with open(args.auth, "r") as f:
         auth_json = json.load(f)
         auth = {
             'access_token': auth_json['access_token'],
