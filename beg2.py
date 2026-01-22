@@ -90,7 +90,6 @@ def main(position, auth):
                             break
                         time.sleep(1)
             if long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS or short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS:
-                raise ValueError("bps calculation error, check mark price and order prices")
                 cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
                 order_dict = None
                 clean_orders(auth)
