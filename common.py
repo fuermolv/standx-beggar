@@ -23,7 +23,7 @@ def clean_positions(auth):
         price = entry_price
         logger.info(f'Cleaning position: side={side}, qty={qty}, entry_price={entry_price}, maker price {price}, position_value={abs(float(position["position_value"]))}')
         cl_ord_id = maker_clean_position(auth, price, qty, clean_side)
-        for index in range(30):
+        for index in range(120):
             logger.info(f'{index} waiting maker cleaning position order  qty: {qty}  order price: {price}')
             if not [position for position in query_positions(auth) if position['qty'] and float(position['qty']) != 0]:
                 logger.info("maker clean position filled")
