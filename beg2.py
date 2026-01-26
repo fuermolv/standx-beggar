@@ -39,6 +39,7 @@ _should_exit = False
 st_book = None
 st_book_ts = 0
 st_position = None
+st_price = None
 
 
 def main(position, auth):
