@@ -7,7 +7,7 @@ from backoff import CancelBackoff
 import signal
 import argparse
 from st_ws import StandXBookWS, StandXPositionWS
-from st_http import cancel_orders
+from st_http import cancel_orders, query_open_orders
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from config import SKIP_HOUR_START, SKIP_HOUR_END
@@ -107,7 +107,16 @@ def main(position, auth):
                 else:
                     next_sleep = backoff.next_sleep()
                     logger.info(f"bps out of range, canceling orders, sleeping for {next_sleep} seconds")
-                    time.sleep(next_sleep)
+                    for _i in range(int(next_sleep) * 2):
+                        res = query_open_orders(auth)
+                        orders = res.get("result", [])
+                        cl_order_ids = [order["cl_ord_id"] for order in orders]
+                        if cl_order_ids:
+                            clean_orders(auth)
+                        if st_position:
+                            break
+                        time.sleep(0.5)
+                
         else:   
             current_time = datetime.now(ZoneInfo("Asia/Shanghai"))
             current_hour = current_time.hour
