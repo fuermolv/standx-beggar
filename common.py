@@ -100,6 +100,7 @@ def clean_orders(auth):
         if cl_order_ids:
             cancel_orders(auth, cl_order_ids)
             logger.info(f"try canceled all open orders: {cl_order_ids}")
+            time.sleep(0.1)
         else:
             logger.info("no open orders to cancel")
             break
