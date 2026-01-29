@@ -37,6 +37,9 @@ def send_lark_message(message: str):
 
 
 def clean_positions(auth):
+    for _ in range(5):
+        clean_orders(auth)
+        time.sleep(1)
     positions = query_positions(auth)
     if not [position for position in positions if position['qty'] and float(position['qty']) != 0]:
         logger.info("no positions to clean")
