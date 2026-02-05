@@ -80,10 +80,11 @@ def main(position, auth):
         if order_dict:
             long_diff_bps = (best_bid_price - order_dict['long_price']) / best_bid_price * 10000 if order_dict['long_cl_ord_id'] else None
             short_diff_bps = (order_dict['short_price'] - best_ask_price) / best_ask_price * 10000 if order_dict['short_cl_ord_id'] else None
+            short_depeth = book_ws.depth_below_price(st_book, order_dict['short_price'])
+            long_depeth = book_ws.depth_above_price(st_book, order_dict['long_price'])
             if last_price != mark_price:
                 last_price = mark_price
-                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}')
-           
+                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}')
             if st_position:
                 if st_position['qty'] and float(st_position['qty']) != 0:
                     logger.info("existing position detected, canceling orders and cleaning position")
@@ -97,8 +98,11 @@ def main(position, auth):
                         time.sleep(1)
                 continue
             time_diff = time.time() - st_book_ts
-            if (long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS or short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS) or time_diff > 0.6:
-                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, time_diff: {format(time_diff, ".3f")}')
+            if (long_diff_bps <= MIN_BPS or long_diff_bps >= MAX_BPS or short_diff_bps <= MIN_BPS or short_diff_bps >= MAX_BPS) \
+            or time_diff > 0.6 \
+            or (short_depeth < 2 or long_depeth < 2):
+
+                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}, time_diff: {format(time_diff, ".3f")}')
                 cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
                 clean_orders(auth)
                 order_dict = None
@@ -140,6 +144,15 @@ def main(position, auth):
                 logger.info(f"book data too old, skipping order creation, { time_diff }")
                 time.sleep(1)
                 continue
+            short_depeth = book_ws.depth_below_price(st_book, short_order['price'])
+            long_depeth = book_ws.depth_above_price(st_book, long_order['price'])
+
+            if short_depeth < 2 or long_depeth < 2:
+                next_sleep = backoff.next_sleep
+                logger.info(f"not enough depth to place orders, long_depth:{format(long_depeth, '.3f')}, short_depth:{format(short_depeth, '.3f')}, skipping order creation for {next_sleep} seconds")
+                time.sleep(next_sleep)
+                continue
+
             cl_ord_ids = create_orders(auth, [long_order, short_order])
             order_dict = {
                 'long_cl_ord_id': cl_ord_ids[0],

@@ -105,6 +105,28 @@ class StandXBookWS(StandXWSBase):
         self.symbol = symbol
         self.setter = setter
 
+    def depth_above_price(self, data, price):
+        price = float(price)
+        bids = data["bids"]
+        total_qty = 0
+        for p_str, qty_str in bids:
+            p = float(p_str)
+            qty = float(qty_str)
+            if p >= price:
+                total_qty += qty
+        return total_qty
+
+    def depth_below_price(self, data, price):
+        price = float(price)
+        asks = data["asks"]
+        total_qty = 0
+        for p_str, qty_str in asks:
+            p = float(p_str)
+            qty = float(qty_str)
+            if p <= price:
+                total_qty += qty
+        return total_qty
+
     def get_mid_price(self, data):
         best_ask = min(float(p) for p, _ in data['asks'])
         best_bid = max(float(p) for p, _ in data['bids'])
