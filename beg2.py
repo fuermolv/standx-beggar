@@ -30,8 +30,8 @@ signal.signal(signal.SIGTERM, _on_term)
 signal.signal(signal.SIGINT, _on_term)
 
 
-BPS = 8.5
-MIN_BPS = 7
+BPS = 8
+MIN_BPS = 6.5
 MAX_BPS = 10
 THROTTLE_BPS = 12
 MIN_DEP = 4
