@@ -79,8 +79,13 @@ def main(position, auth):
             raise Exception("invalid mark price from ws")
         
         if order_dict:
-            long_diff_bps = (best_bid_price - order_dict['long_price']) / best_bid_price * 10000 if order_dict['long_cl_ord_id'] else None
-            short_diff_bps = (order_dict['short_price'] - best_ask_price) / best_ask_price * 10000 if order_dict['short_cl_ord_id'] else None
+            # long_diff_bps = (best_bid_price - order_dict['long_price']) / best_bid_price * 10000 if order_dict['long_cl_ord_id'] else None
+            # short_diff_bps = (order_dict['short_price'] - best_ask_price) / best_ask_price * 10000 if order_dict['short_cl_ord_id'] else None
+            
+            # mark_price
+            long_diff_bps = (mark_price - order_dict['long_price']) / mark_price * 10000 if order_dict['long_cl_ord_id'] else None 
+            short_diff_bps = (order_dict['short_price'] - mark_price) / mark_price * 10000 if order_dict['short_cl_ord_id'] else None
+
             short_depeth = book_ws.depth_below_price(st_book, order_dict['short_price'])
             long_depeth = book_ws.depth_above_price(st_book, order_dict['long_price'])
             if last_price != mark_price:
