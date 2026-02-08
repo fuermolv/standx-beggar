@@ -30,11 +30,6 @@ signal.signal(signal.SIGTERM, _on_term)
 signal.signal(signal.SIGINT, _on_term)
 
 
-BPS = 8.5
-MIN_BPS = 7
-MAX_BPS = 10
-THROTTLE_BPS = 12
-MIN_DEP = 4
 
 _should_exit = False
 st_book = None
@@ -177,8 +172,23 @@ def main(position, auth):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--position", default=500, type=int, help="Position size")
+    parser.add_argument("--bps", default=8.5, type=float, help="BPS for order placement")
+    parser.add_argument("--max_bps", default=10, type=float, help="Max BPS for order placement")
+    parser.add_argument("--min_bps", default=7, type=float, help="Min BPS for order placement")
+    parser.add_argument("--throttle_bps", default=12, type=float, help="BPS for throttling order placement when market is unfavorable")
+    parser.add_argument("--min_dep", default=4, type=float, help="Minimum depth required to place orders")
     parser.add_argument("--auth", default="standx_beggar_auth.json", type=str, help="Path to auth json file")
     args = parser.parse_args()
+
+
+    global BPS, MAX_BPS, MIN_BPS, THROTTLE_BPS, MIN_DEP
+    BPS = args.bps
+    MAX_BPS = args.max_bps
+    MIN_BPS = args.min_bps
+    THROTTLE_BPS = args.throttle_bps
+    MIN_DEP = args.min_dep
+
+
 
     with open(args.auth, "r") as f:
         auth_json = json.load(f)
@@ -186,6 +196,7 @@ if __name__ == "__main__":
             'access_token': auth_json['access_token'],
             'signing_key': SigningKey(bytes.fromhex(auth_json['signing_key'])),
         }
+    print(f"Starting beggar with position: {args.position}, bps: {BPS}, max_bps: {MAX_BPS}, min_bps: {MIN_BPS}, throttle_bps: {THROTTLE_BPS}, min_dep: {MIN_DEP}")
     while True:
         try:
             clean_orders(auth)
