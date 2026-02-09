@@ -91,7 +91,7 @@ def main(position, auth):
                     logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}')
                     last_log_timestamp = now_timestmp
             if st_position:
-                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}')
+                logger.info(f'st_position detect, pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}')
                 if st_position['qty'] and float(st_position['qty']) != 0:
                     logger.info("existing position detected, canceling orders and cleaning position")
                     cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
@@ -108,7 +108,7 @@ def main(position, auth):
             or time_diff > 0.6 \
             or (short_depeth < MIN_DEP or long_depeth < MIN_DEP):
 
-                logger.info(f'pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}, time_diff: {format(time_diff, ".3f")}')
+                logger.info(f'out of range, pos:{position}, mark_price: {mark_price}, best_ask: {best_ask_price}, best_bid: {best_bid_price}, long order bps: {long_diff_bps}, short order bps: {short_diff_bps}, long_depth:{format(long_depeth, ".3f")}, short_depth:{format(short_depeth, ".3f")}, time_diff: {format(time_diff, ".3f")}')
                 cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
                 clean_orders(auth)
                 order_dict = None
