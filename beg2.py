@@ -97,7 +97,6 @@ def main(position, auth):
                     cancel_orders(auth, [cid for cid in [order_dict['long_cl_ord_id'], order_dict['short_cl_ord_id']] if cid])
                     clean_positions(auth)
                     order_dict = None
-                    st_position = None
                     logger.info("position cleaned, placing new orders after 900 seconds")
                     for i in range(900):
                         if _should_exit:
